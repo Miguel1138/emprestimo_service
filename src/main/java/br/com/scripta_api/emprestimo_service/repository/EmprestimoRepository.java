@@ -43,10 +43,6 @@ public class EmprestimoRepository implements EmprestimoService {
      * TODO: Implementar renovarEmprestimo (RF-A07 / RN 3).
      *
      * TODO: Implementar os métodos de listagem (RF-A06, RF-B08).
-     * @param request
-     * @param token
-     * @param alunoId
-     * @return
      */
     @Override
     public Emprestimo solicitarEmprestimo(SolicitacaoEmprestimoRequest request, String token, Long alunoId) {

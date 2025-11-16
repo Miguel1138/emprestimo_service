@@ -21,11 +21,14 @@ public class EmprestimoEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     // TODO VERIFICAR INTEGRAÇÃO COM OUTROS SERVIÇOS PARA ESSAS INFOS.
+    @Column(unique = true, nullable = false)
     private Long alunoId;
+    @Column(unique = true, nullable = false)
     private Long livroId;
     private LocalDate dataEmprestimo;
     private LocalDate dataPrevistaDevolucao;
     private LocalDate dataDevolucaoReal;
+    @Column(nullable = false)
     private boolean renovado;
     @Enumerated(EnumType.STRING)
     private StatusEmprestimo status;
