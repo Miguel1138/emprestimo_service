@@ -9,7 +9,7 @@ public class PenalidadeBuilder {
         this.penalidade = new Penalidade();
     }
 
-    public static PenalidadeBuilder buidler() {
+    public static PenalidadeBuilder builder() {
         return new PenalidadeBuilder();
     }
 
