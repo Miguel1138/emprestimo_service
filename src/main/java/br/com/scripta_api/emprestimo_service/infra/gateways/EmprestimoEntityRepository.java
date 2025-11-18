@@ -9,14 +9,11 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface EmprestimoEntityRepository extends JpaRepository<EmprestimoEntity, Long> {
-    @Query("SELECT * " +
+    @Query("SELECT e " +
             "FROM emprestimos e " +
-            "WHERE e.alunoId = :alunoId" +
-            "e.status IN (:status)" +
-            "ORDER BY CASE WHEN e.status = 'ATRASADO' " +
-            "   THEN 0 " +
-            "   ELSE 1" +
-            "    END ASC")
+            "WHERE e.alunoId = :alunoId " +
+            "AND e.status IN (:status) " +
+            "ORDER BY CASE WHEN e.status = 'ATRASADO' THEN 0 ELSE 1 END ASC")
     List<EmprestimoEntity> findEmprestimoEntityByAlunoIdAndStatusIn(Long alunoId, List<StatusEmprestimo> status);
 
     List<EmprestimoEntity> findByStatusAndDataPrevistaDevolucaoBefore(StatusEmprestimo status, LocalDate today);
