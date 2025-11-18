@@ -1,18 +1,20 @@
 package br.com.scripta_api.emprestimo_service.config;
 
-import lombok.Value;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
 public class WebClientConfig {
-    
 
-/**
- * TODO: Anotar com @Configuration.
- *
- * TODO: Injetar @Value("${client.catalogo.url}") String baseUrl.
- *
- * TODO: Criar um @Bean WebClient que usa esse baseUrl.
- */
+    @Value("${client.catalogo.url}")
+    private String catalogoUrl;
 
+    @Bean
+    public WebClient webClient() {
+        return WebClient.builder()
+                .baseUrl(catalogoUrl)
+                .build();
+    }
 }
