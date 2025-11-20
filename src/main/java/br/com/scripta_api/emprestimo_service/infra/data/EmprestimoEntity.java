@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 
 @Entity(name = "emprestimos")
-@Table(name = "emprestimoss")
+@Table(name = "emprestimos")
 @Data
 @Builder
 @NoArgsConstructor
@@ -20,8 +20,7 @@ public class EmprestimoEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    // TODO VERIFICAR INTEGRAÇÃO COM OUTROS SERVIÇOS PARA ESSAS INFOS.
-    @Column(unique = true, nullable = false)
+    @Column(nullable = false)
     private Long alunoId;
     @Column(unique = true, nullable = false)
     private Long livroId;

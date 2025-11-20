@@ -1,71 +1,140 @@
 package br.com.scripta_api.emprestimo_service.repository;
 
 import br.com.scripta_api.emprestimo_service.application.domain.emprestimo.Emprestimo;
+import br.com.scripta_api.emprestimo_service.application.domain.emprestimo.EmprestimoBuilder;
+import br.com.scripta_api.emprestimo_service.application.domain.emprestimo.StatusEmprestimo;
 import br.com.scripta_api.emprestimo_service.application.gateways.EmprestimoService;
 import br.com.scripta_api.emprestimo_service.dto.DevolucaoRequest;
 import br.com.scripta_api.emprestimo_service.dto.SolicitacaoEmprestimoRequest;
+import br.com.scripta_api.emprestimo_service.exception.RegraNegocioException;
+import br.com.scripta_api.emprestimo_service.infra.data.EmprestimoEntity;
+import br.com.scripta_api.emprestimo_service.infra.data.PenalidadeEntity;
 import br.com.scripta_api.emprestimo_service.infra.gateways.EmprestimoEntityRepository;
+import br.com.scripta_api.emprestimo_service.infra.gateways.PenalidadeEntityRepository;
+import br.com.scripta_api.emprestimo_service.integration.CatalogoServiceOrquestrador;
 import br.com.scripta_api.emprestimo_service.repository.mapper.EmprestimoMapper;
 import br.com.scripta_api.emprestimo_service.repository.mapper.PenalidadeMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
 public class EmprestimoRepository implements EmprestimoService {
-    private final EmprestimoEntityRepository repository;
-    private final EmprestimoMapper mapper;
+    private final EmprestimoEntityRepository emprestimoEntityRepository;
+    private final PenalidadeEntityRepository penalidadeEntityRepository;
+    private final EmprestimoMapper emprestimoMapper;
     private final PenalidadeMapper penalidadeMapper;
+    private final CatalogoServiceOrquestrador serviceOrquestrador;
 
-    /**
-     * TODO: Implementar solicitarEmprestimo (RF-A05):
-     *
-     * TODO: [RN 4] Verificar penalidadeRepository.findByAlunoId.... Se existir, lançar RegraNegocioException (RECUSADO_PENALIZADO).
-     *
-     * TODO: [RN 1] Verificar emprestimoRepository.countByAlunoId.... Se atrasado, lançar (RECUSADO_ATRASADO). Se limite >= 5, lançar (RECUSADO_LIMITE).
-     *
-     * TODO: Criar Emprestimo (domínio) com status PENDENTE.
-     *
-     * TODO: Salvar no banco (via mapper e repository).
-     *
-     * TODO: [RNF-08] Chamar catalogoOrquestrador.decrementarEstoque(livroId, token) (método @Async).
-     *
-     * TODO: Implementar registrarDevolucao (RF-B07):
-     *
-     * TODO: Buscar o Empréstimo. Atualizar status para DEVOLVIDO.
-     *
-     * TODO: [RN 4] Verificar se dataDevolucao > dataPrevista. Se sim, calcular dias corridos e salvar Penalidade.
-     *
-     * TODO: [RNF-08] Chamar catalogoOrquestrador.incrementarEstoque(livroId, token) (método @Async).
-     *
-     * TODO: Implementar renovarEmprestimo (RF-A07 / RN 3).
-     *
-     * TODO: Implementar os métodos de listagem (RF-A06, RF-B08).
-     */
+    @Transactional
     @Override
     public Emprestimo solicitarEmprestimo(SolicitacaoEmprestimoRequest request, String token, Long alunoId) {
-        return null;
+        Optional<PenalidadeEntity> temPenalidade =
+                penalidadeEntityRepository.findByAlunoIdAndDataFimPenalidadeAfter(alunoId, LocalDate.now());
+        if (temPenalidade.isPresent()) {
+            throw new RegraNegocioException(StatusEmprestimo.RECUSADO_PENALIZADO);
+        }
+        List<EmprestimoEntity> livrosLocadosPeloAluno =
+                emprestimoEntityRepository.findEmprestimoEntityByAlunoIdAndStatusIn(
+                        alunoId,
+                        List.of(StatusEmprestimo.CONFIRMADO, StatusEmprestimo.ATRASADO));
+
+        if (livrosLocadosPeloAluno.size() >= 5) {
+            throw new RegraNegocioException(StatusEmprestimo.RECUSADO_LIMITE);
+        }
+
+        boolean possuiEmprestimoAtrasado = livrosLocadosPeloAluno.stream()
+                .anyMatch(e -> e.getStatus() == StatusEmprestimo.ATRASADO);
+
+        if (possuiEmprestimoAtrasado) {
+            throw new RegraNegocioException(StatusEmprestimo.RECUSADO_ATRASADO);
+        }
+
+        Emprestimo domain = EmprestimoBuilder.builder()
+                .alunoId(alunoId)
+                .livroId(request.getLivroId())
+                .status(StatusEmprestimo.PENDENTE)
+                .dataEmprestimo(LocalDate.now())
+                .build();
+
+        EmprestimoEntity savedEntity = emprestimoEntityRepository.save(emprestimoMapper.toEntity(domain));
+        domain = emprestimoMapper.toDomain(savedEntity);
+        try {
+            serviceOrquestrador.decrementarEstoque(domain, token);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        return domain;
     }
 
+    @Transactional
     @Override
     public Emprestimo renovarEmprestimo(Long emprestimoId, Long alunoId) {
-        return null;
+        if (penalidadeEntityRepository.existsByAlunoId(alunoId)) {
+            throw new RegraNegocioException(StatusEmprestimo.RECUSADO_PENALIZADO);
+        }
+
+        var renovaLivro = emprestimoEntityRepository.findById(emprestimoId).orElseThrow();
+        if (renovaLivro.isRenovado()) {
+            throw new RegraNegocioException(StatusEmprestimo.JA_RENOVOU);
+        }
+
+        renovaLivro.setRenovado(true);
+        renovaLivro.setDataPrevistaDevolucao(renovaLivro
+                .getDataPrevistaDevolucao()
+                .plusDays(30));
+        return emprestimoMapper.toDomain(emprestimoEntityRepository.save(renovaLivro));
+    }
+
+    @Transactional
+    @Override
+    public Emprestimo registrarDevolucao(DevolucaoRequest request, String token) {
+        Optional<EmprestimoEntity> livroEntity = emprestimoEntityRepository.findById(request.getEmprestimoId());
+        if (livroEntity.isEmpty()) {
+            throw new RegraNegocioException(StatusEmprestimo.FALHOU);
+        }
+
+        EmprestimoEntity livroDevolvido = livroEntity.get();
+        livroDevolvido.setStatus(StatusEmprestimo.DEVOLVIDO);
+        livroDevolvido.setDataDevolucaoReal(LocalDate.now());
+        if (livroDevolvido.getDataDevolucaoReal().isAfter(livroDevolvido.getDataPrevistaDevolucao())) {
+            long diasAtraso = ChronoUnit.DAYS.between(livroDevolvido.getDataPrevistaDevolucao(), livroDevolvido.getDataDevolucaoReal());
+            if (!penalidadeEntityRepository.existsByAlunoId(livroDevolvido.getAlunoId())) {
+                PenalidadeEntity newPenalidade = PenalidadeEntity.builder()
+                        .alunoId(livroDevolvido.getAlunoId())
+                        .dataFimPenalidade(LocalDate.now().plusDays(diasAtraso))
+                        .build();
+                penalidadeEntityRepository.save(newPenalidade);
+            }
+        }
+        serviceOrquestrador.incrementarEstoque(livroDevolvido.getLivroId(), token);
+        return emprestimoMapper.toDomain(livroDevolvido);
     }
 
     @Override
-    public Emprestimo registrarDevolucao(DevolucaoRequest request) {
-        return null;
-    }
-
-    @Override
+    @Transactional(readOnly = true)
     public List<Emprestimo> listarEmprestimosAtivosPorAluno(Long alunoId) {
-        return List.of();
+        return emprestimoEntityRepository.findAllByAlunoIdAndStatusIn(
+                        alunoId,
+                        List.of(StatusEmprestimo.PENDENTE, StatusEmprestimo.CONFIRMADO, StatusEmprestimo.ATRASADO))
+                .stream()
+                .map(emprestimoMapper::toDomain)
+                .toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Emprestimo> listarHistoricoCompletoAluno(Long alunoId) {
-        return List.of();
+        return emprestimoEntityRepository.findAllByAlunoId(alunoId)
+                .stream()
+                .map(emprestimoMapper::toDomain)
+                .toList();
     }
 }

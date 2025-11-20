@@ -8,5 +8,6 @@ public enum StatusEmprestimo {
     RECUSADO_LIMITE,
     RECUSADO_ATRASADO,
     RECUSADO_PENALIZADO,
+    JA_RENOVOU,
     FALHOU
 }

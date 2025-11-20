@@ -3,14 +3,13 @@ package br.com.scripta_api.emprestimo_service.dto;
 import br.com.scripta_api.emprestimo_service.application.domain.emprestimo.Emprestimo;
 import br.com.scripta_api.emprestimo_service.application.domain.emprestimo.StatusEmprestimo;
 import lombok.Builder;
-import lombok.Data;
 
 import java.time.LocalDate;
 
 /**
  * TODO:Ajustar EMprestimo para trazer a matricula do aluno.
  */
-@Data
+
 @Builder
 public record EmprestimoResponse(
         Long id,

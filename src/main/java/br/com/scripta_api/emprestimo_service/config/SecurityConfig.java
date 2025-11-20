@@ -1,48 +1,81 @@
 package br.com.scripta_api.emprestimo_service.config;
 
-//TODO: Anotar a classe com @Configuration, @EnableWebSecurity e @RequiredArgsConstructor.
-//
-//        TODO: Injetar o jwt.secret (o mesmo do usuario-service): @Value("${jwt.secret}") String jwtSecret;.
-//
-//TODO: Criar o @Bean principal public SecurityFilterChain securityFilterChain(HttpSecurity http) (conforme RNF-05).
-//
-//TODO: Dentro do securityFilterChain:
-//
-//TODO: Desabilitar o CSRF: .csrf(AbstractHttpConfigurer::disable).
-//
-//TODO: Definir a política de sessão como STATELESS.
-//
-//        TODO: Configurar o oauth2ResourceServer para usar um jwtDecoder() customizado: .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder()).jwtAuthenticationConverter(jwtAuthenticationConverter()))).
-//
-//TODO: Definir o "Firewall" com authorizeHttpRequests:
-//
-//        (RF-A05/A07) .requestMatchers(HttpMethod.POST, "/emprestimos", "/emprestimos/**/renovar").hasRole("ALUNO")
-//
-//(RF-A06) .requestMatchers(HttpMethod.GET, "/emprestimos/meus").hasRole("ALUNO")
-//
-//(RF-B07) .requestMatchers(HttpMethod.POST, "/emprestimos/devolucao").hasRole("BIBLIOTECARIO")
-//
-//(RF-B08) .requestMatchers(HttpMethod.GET, "/emprestimos/historico/**").hasRole("BIBLIOTECARIO")
-//
-//(Padrão) .anyRequest().authenticated()
-//
-//TODO: Criar o @Bean public JwtDecoder jwtDecoder():
-//
-//TODO: Criar a SecretKey a partir do jwtSecret (ex: new SecretKeySpec(jwtSecret.getBytes(), "HMACSHA256")).
-//
-//TODO: Retornar NimbusJwtDecoder.withSecretKey(secretKey).build().
-//
-//TODO: Criar o @Bean public JwtAuthenticationConverter jwtAuthenticationConverter():
-//
-//TODO: Criar um JwtGrantedAuthoritiesConverter.
-//
-//        TODO: Definir o nome da claim de papéis (RNF-07): converter.setAuthoritiesClaimName("roles");
-//
-//TODO: Remover o prefixo "ROLE_" (pois ele já vem do usuario-service): converter.setAuthorityPrefix("");.
-//
-//TODO: Criar um JwtAuthenticationConverter, aplicar o converter a ele e retorná-lo.
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.SecurityFilterChain;
 
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 
+@Configuration
+@EnableWebSecurity
 public class SecurityConfig {
 
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // Configura a aplicação como um Resource Server que aceita JWTs
+                .oauth2ResourceServer(oauth -> oauth
+                        .jwt(jwt -> jwt
+                                .decoder(jwtDecoder())
+                                .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                        )
+                )
+
+                .authorizeHttpRequests(authz -> authz
+                        // Regras de ALUNO (RF-A05, RF-A06, RF-A07)
+                        .requestMatchers(HttpMethod.POST, "/emprestimos").hasRole("ALUNO")
+                        .requestMatchers(HttpMethod.POST, "/emprestimos/*/renovar").hasRole("ALUNO")
+                        .requestMatchers(HttpMethod.GET, "/emprestimos/meus").hasRole("ALUNO")
+
+                        // Regras de BIBLIOTECARIO (RF-B07, RF-B08)
+                        .requestMatchers(HttpMethod.POST, "/emprestimos/devolucao").hasRole("BIBLIOTECARIO")
+                        .requestMatchers(HttpMethod.GET, "/emprestimos/historico/**").hasRole("BIBLIOTECARIO")
+
+                        // Qualquer outra requisição exige autenticação
+                        .anyRequest().authenticated()
+                );
+
+        return http.build();
+    }
+
+    /**
+     * Bean responsável por decodificar e validar a assinatura do JWT.
+     * Usa a chave secreta simétrica (HMAC) compartilhada.
+     */
+    @Bean
+    public JwtDecoder jwtDecoder() {
+        var secretKey = new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        return NimbusJwtDecoder.withSecretKey(secretKey).build();
+    }
+
+    /**
+     * Bean responsável por converter as claims do JWT em Autoridades do Spring Security.
+     * Configurado para ler a claim "roles" e não adicionar prefixo extra.
+     */
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
+        grantedAuthoritiesConverter.setAuthoritiesClaimName("roles"); // Lê a claim "roles" do token
+        grantedAuthoritiesConverter.setAuthorityPrefix(""); // Não adiciona prefixo (o token já tem "ROLE_")
+
+        JwtAuthenticationConverter jwtConverter = new JwtAuthenticationConverter();
+        jwtConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
+        return jwtConverter;
+    }
 }
