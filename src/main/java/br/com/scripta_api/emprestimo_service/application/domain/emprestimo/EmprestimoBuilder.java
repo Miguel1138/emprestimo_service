@@ -53,8 +53,18 @@ public class EmprestimoBuilder {
         return this;
     }
 
-    //    TODO: [TDD/RN] No método build(), adicionar as validações de criação (ex: alunoId, livroId e status não podem ser nulos)
     public Emprestimo build() {
+        if (emprestimo.getAlunoId() == null) {
+            throw new RuntimeException("AlunoId vazio!");
+        }
+
+        if (emprestimo.getLivroId() == null) {
+            throw new RuntimeException("LivroId nulo");
+        }
+
+        if (emprestimo.getStatus() == null) {
+            throw new RuntimeException("Status do emprestiom está nulo");
+        }
         return this.emprestimo;
     }
 }
