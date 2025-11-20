@@ -105,17 +105,26 @@ public class EmprestimoRepository implements EmprestimoService {
         livroDevolvido.setStatus(StatusEmprestimo.DEVOLVIDO);
         livroDevolvido.setDataDevolucaoReal(LocalDate.now());
         if (livroDevolvido.getDataDevolucaoReal().isAfter(livroDevolvido.getDataPrevistaDevolucao())) {
-            long diasAtraso = ChronoUnit.DAYS.between(livroDevolvido.getDataPrevistaDevolucao(), livroDevolvido.getDataDevolucaoReal());
-            if (!penalidadeEntityRepository.existsByAlunoId(livroDevolvido.getAlunoId())) {
-                PenalidadeEntity newPenalidade = PenalidadeEntity.builder()
-                        .alunoId(livroDevolvido.getAlunoId())
-                        .dataFimPenalidade(LocalDate.now().plusDays(diasAtraso))
-                        .build();
-                penalidadeEntityRepository.save(newPenalidade);
-            }
+            registraPenalidadePelo(livroDevolvido);
         }
+
         serviceOrquestrador.incrementarEstoque(livroDevolvido.getLivroId(), token);
         return emprestimoMapper.toDomain(livroDevolvido);
+    }
+
+    private void registraPenalidadePelo(EmprestimoEntity livroDevolvido) {
+        long diasEmAtraso = ChronoUnit.DAYS.between(livroDevolvido.getDataPrevistaDevolucao(), livroDevolvido.getDataDevolucaoReal());
+        if (!penalidadeEntityRepository.existsByAlunoId(livroDevolvido.getAlunoId())) {
+            PenalidadeEntity novaPenalidade = PenalidadeEntity.builder()
+                    .alunoId(livroDevolvido.getAlunoId())
+                    .dataFimPenalidade(LocalDate.now().plusDays(diasEmAtraso))
+                    .build();
+            penalidadeEntityRepository.save(novaPenalidade);
+        } else {
+            PenalidadeEntity penalidadeExistente = penalidadeEntityRepository.findByAlunoId(livroDevolvido.getAlunoId()).orElseThrow();
+            penalidadeExistente.getDataFimPenalidade().plusDays(diasEmAtraso);
+            penalidadeEntityRepository.save(penalidadeExistente);
+        }
     }
 
     @Override
