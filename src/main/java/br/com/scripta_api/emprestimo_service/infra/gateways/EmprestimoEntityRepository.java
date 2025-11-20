@@ -7,7 +7,6 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.stream.Stream;
 
 public interface EmprestimoEntityRepository extends JpaRepository<EmprestimoEntity, Long> {
     @Query("SELECT e " +
@@ -19,9 +18,9 @@ public interface EmprestimoEntityRepository extends JpaRepository<EmprestimoEnti
 
     List<EmprestimoEntity> findByStatusAndDataPrevistaDevolucaoBefore(StatusEmprestimo status, LocalDate today);
 
-    Stream<EmprestimoEntity> findAllByAlunoId(Long alunoId);
+    List<EmprestimoEntity> findAllByAlunoId(Long alunoId);
 
-    Stream<EmprestimoEntity> findAllByAlunoIdAndStatusIn(Long alunoId, List<StatusEmprestimo> status);
+    List<EmprestimoEntity> findAllByAlunoIdAndStatusIn(Long alunoId, List<StatusEmprestimo> status);
 
     Object countByAlunoIdAndStatusIn(Long eq, List<StatusEmprestimo> eq1);
 }

@@ -19,7 +19,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.Period;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,7 +49,10 @@ public class EmprestimoRepository implements EmprestimoService {
             throw new RegraNegocioException(StatusEmprestimo.RECUSADO_LIMITE);
         }
 
-        if (livrosLocadosPeloAluno.stream().findFirst().get().getStatus() == StatusEmprestimo.ATRASADO) {
+        boolean possuiEmprestimoAtrasado = livrosLocadosPeloAluno.stream()
+                .anyMatch(e -> e.getStatus() == StatusEmprestimo.ATRASADO);
+
+        if (possuiEmprestimoAtrasado) {
             throw new RegraNegocioException(StatusEmprestimo.RECUSADO_ATRASADO);
         }
 
@@ -74,7 +77,7 @@ public class EmprestimoRepository implements EmprestimoService {
     @Transactional
     @Override
     public Emprestimo renovarEmprestimo(Long emprestimoId, Long alunoId) {
-        if (penalidadeEntityRepository.existsById(alunoId)) {
+        if (penalidadeEntityRepository.existsByAlunoId(alunoId)) {
             throw new RegraNegocioException(StatusEmprestimo.RECUSADO_PENALIZADO);
         }
 
@@ -100,16 +103,14 @@ public class EmprestimoRepository implements EmprestimoService {
 
         EmprestimoEntity livroDevolvido = livroEntity.get();
         livroDevolvido.setStatus(StatusEmprestimo.DEVOLVIDO);
+        livroDevolvido.setDataDevolucaoReal(LocalDate.now());
         if (livroDevolvido.getDataDevolucaoReal().isAfter(livroDevolvido.getDataPrevistaDevolucao())) {
-            Period penalidadePorAtraso = Period.between(livroDevolvido.getDataPrevistaDevolucao(), livroDevolvido.getDataDevolucaoReal());
+            long diasAtraso = ChronoUnit.DAYS.between(livroDevolvido.getDataPrevistaDevolucao(), livroDevolvido.getDataDevolucaoReal());
             if (!penalidadeEntityRepository.existsByAlunoId(livroDevolvido.getAlunoId())) {
                 PenalidadeEntity newPenalidade = PenalidadeEntity.builder()
                         .alunoId(livroDevolvido.getAlunoId())
-                        .dataFimPenalidade(LocalDate.of(
-                                penalidadePorAtraso.getYears(),
-                                penalidadePorAtraso.getMonths(),
-                                penalidadePorAtraso.getDays())
-                        ).build();
+                        .dataFimPenalidade(LocalDate.now().plusDays(diasAtraso))
+                        .build();
                 penalidadeEntityRepository.save(newPenalidade);
             }
         }
@@ -123,6 +124,7 @@ public class EmprestimoRepository implements EmprestimoService {
         return emprestimoEntityRepository.findAllByAlunoIdAndStatusIn(
                         alunoId,
                         List.of(StatusEmprestimo.PENDENTE, StatusEmprestimo.CONFIRMADO, StatusEmprestimo.ATRASADO))
+                .stream()
                 .map(emprestimoMapper::toDomain)
                 .toList();
     }
@@ -131,6 +133,7 @@ public class EmprestimoRepository implements EmprestimoService {
     @Transactional(readOnly = true)
     public List<Emprestimo> listarHistoricoCompletoAluno(Long alunoId) {
         return emprestimoEntityRepository.findAllByAlunoId(alunoId)
+                .stream()
                 .map(emprestimoMapper::toDomain)
                 .toList();
     }
