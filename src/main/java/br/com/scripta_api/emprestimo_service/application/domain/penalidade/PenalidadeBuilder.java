@@ -28,8 +28,14 @@ public class PenalidadeBuilder {
         return this;
     }
 
-    // TODO: [TDD/RN] No método build(), adicionar validações (ex: alunoId e dataFimPenalidade não podem ser nulos).
     public Penalidade build() {
+        if (penalidade.getAlunoId() == null) {
+            throw new RuntimeException("AlunoId nulo");
+        }
+
+        if (penalidade.getDataFimPenalidade() == null) {
+            throw new RuntimeException("Data de fim penalidade nulo");
+        }
         return this.penalidade;
     }
 
