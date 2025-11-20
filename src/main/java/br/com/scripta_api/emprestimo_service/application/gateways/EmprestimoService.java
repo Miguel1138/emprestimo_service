@@ -11,7 +11,7 @@ public interface EmprestimoService {
 
     Emprestimo renovarEmprestimo(Long emprestimoId, Long alunoId);
 
-    Emprestimo registrarDevolucao(DevolucaoRequest request);
+    Emprestimo registrarDevolucao(DevolucaoRequest request, String token);
 
     List<Emprestimo> listarEmprestimosAtivosPorAluno(Long alunoId);
 

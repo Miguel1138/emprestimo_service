@@ -9,4 +9,8 @@ import java.util.Optional;
 public interface PenalidadeEntityRepository extends JpaRepository<PenalidadeEntity, Long> {
 
     Optional<PenalidadeEntity> findByAlunoIdAndDataFimPenalidadeAfter(Long alunoId, LocalDate today);
+
+    Optional<PenalidadeEntity> findByAlunoId(Long alunoId);
+
+    boolean existsByAlunoId(Long alunoId);
 }
